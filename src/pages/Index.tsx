@@ -4,6 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 
 const Index = () => {
@@ -16,13 +19,20 @@ const Index = () => {
     retail: false,
   });
 
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [quantity, setQuantity] = useState<number>(1000);
+  const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
+
   const products = [
     {
       id: 1,
       name: 'Старинный кирпич с клеймом "ТД"',
       category: 'vintage',
-      price: '450 ₽/шт',
-      wholesalePrice: '380 ₽/шт',
+      price: 450,
+      priceDisplay: '450 ₽/шт',
+      wholesalePrice: 380,
+      wholesalePriceDisplay: '380 ₽/шт',
+      unit: 'шт',
       year: '1890-1910',
       size: '250×120×65 мм',
       weight: '3.5 кг',
@@ -34,8 +44,11 @@ const Index = () => {
       id: 2,
       name: 'Клинкерная плитка под старину',
       category: 'clinker',
-      price: '3200 ₽/м²',
-      wholesalePrice: '2800 ₽/м²',
+      price: 3200,
+      priceDisplay: '3200 ₽/м²',
+      wholesalePrice: 2800,
+      wholesalePriceDisplay: '2800 ₽/м²',
+      unit: 'м²',
       year: 'Современная',
       size: '240×71×15 мм',
       weight: '1.8 кг/шт',
@@ -47,8 +60,11 @@ const Index = () => {
       id: 3,
       name: 'Кирпич "Империал" с гербом',
       category: 'vintage',
-      price: '650 ₽/шт',
-      wholesalePrice: '550 ₽/шт',
+      price: 650,
+      priceDisplay: '650 ₽/шт',
+      wholesalePrice: 550,
+      wholesalePriceDisplay: '550 ₽/шт',
+      unit: 'шт',
       year: '1880-1900',
       size: '255×125×70 мм',
       weight: '4.0 кг',
@@ -60,8 +76,11 @@ const Index = () => {
       id: 4,
       name: 'Плитка "Терракота" декоративная',
       category: 'clinker',
-      price: '2900 ₽/м²',
-      wholesalePrice: '2500 ₽/м²',
+      price: 2900,
+      priceDisplay: '2900 ₽/м²',
+      wholesalePrice: 2500,
+      wholesalePriceDisplay: '2500 ₽/м²',
+      unit: 'м²',
       year: 'Современная',
       size: '240×60×12 мм',
       weight: '1.5 кг/шт',
@@ -120,13 +139,31 @@ const Index = () => {
 
   const compareProducts = products.filter(p => compareList.includes(p.id));
 
+  const calculateTotal = () => {
+    if (!selectedProduct) return { retail: 0, wholesale: 0, savings: 0 };
+    const product = products.find(p => p.id === selectedProduct);
+    if (!product) return { retail: 0, wholesale: 0, savings: 0 };
+
+    const retailTotal = product.price * quantity;
+    const wholesaleTotal = product.wholesalePrice * quantity;
+    const savings = retailTotal - wholesaleTotal;
+    const savingsPercent = ((savings / retailTotal) * 100).toFixed(1);
+
+    return { retail: retailTotal, wholesale: wholesaleTotal, savings, savingsPercent };
+  };
+
+  const openCalculator = (productId: number) => {
+    setSelectedProduct(productId);
+    setCalculatorOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <nav className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold text-primary">Империал Brick</h1>
-            <div className="hidden md:flex gap-6">
+            <div className="hidden md:flex gap-6 items-center">
               {['home', 'catalog', 'gallery', 'blog', 'delivery', 'contacts'].map(section => (
                 <button
                   key={section}
@@ -143,6 +180,17 @@ const Index = () => {
                   {section === 'contacts' && 'Контакты'}
                 </button>
               ))}
+              <Button
+                size="sm"
+                onClick={() => {
+                  setSelectedProduct(products[0].id);
+                  setCalculatorOpen(true);
+                }}
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                <Icon name="Calculator" size={16} className="mr-2" />
+                Калькулятор
+              </Button>
             </div>
             <Button variant="outline" size="sm" className="md:hidden">
               <Icon name="Menu" size={20} />
@@ -322,20 +370,20 @@ const Index = () => {
                         </div>
                         <div className="mb-4">
                           <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-bold text-primary">{product.price}</span>
+                            <span className="text-2xl font-bold text-primary">{product.priceDisplay}</span>
                             <span className="text-sm text-muted-foreground">розница</span>
                           </div>
                           <div className="flex items-baseline gap-2">
                             <span className="text-xl font-semibold text-accent">
-                              {product.wholesalePrice}
+                              {product.wholesalePriceDisplay}
                             </span>
-                            <span className="text-sm text-muted-foreground">опт (от 1000 шт)</span>
+                            <span className="text-sm text-muted-foreground">опт (от 1000 {product.unit})</span>
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button className="flex-1" size="sm">
-                            <Icon name="ShoppingCart" size={16} className="mr-2" />
-                            Заказать
+                          <Button className="flex-1" size="sm" onClick={() => openCalculator(product.id)}>
+                            <Icon name="Calculator" size={16} className="mr-2" />
+                            Рассчитать
                           </Button>
                           <Button
                             variant={compareList.includes(product.id) ? 'default' : 'outline'}
@@ -416,7 +464,7 @@ const Index = () => {
                           <td className="p-4 font-medium">Цена (розница)</td>
                           {compareProducts.map(product => (
                             <td key={product.id} className="p-4 text-primary font-semibold">
-                              {product.price}
+                              {product.priceDisplay}
                             </td>
                           ))}
                         </tr>
@@ -424,7 +472,7 @@ const Index = () => {
                           <td className="p-4 font-medium">Цена (опт)</td>
                           {compareProducts.map(product => (
                             <td key={product.id} className="p-4 text-accent font-semibold">
-                              {product.wholesalePrice}
+                              {product.wholesalePriceDisplay}
                             </td>
                           ))}
                         </tr>
@@ -659,6 +707,76 @@ const Index = () => {
           </div>
         </section>
       )}
+
+      <Dialog open={calculatorOpen} onOpenChange={setCalculatorOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Калькулятор стоимости</DialogTitle>
+            <DialogDescription>
+              Рассчитайте выгоду при оптовой покупке
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="product">Выберите товар</Label>
+              <select
+                id="product"
+                className="w-full px-4 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                value={selectedProduct || ''}
+                onChange={(e) => setSelectedProduct(Number(e.target.value))}
+              >
+                {products.map(product => (
+                  <option key={product.id} value={product.id}>
+                    {product.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Количество ({products.find(p => p.id === selectedProduct)?.unit || 'шт'})</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="text-lg"
+              />
+            </div>
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Розничная цена:</span>
+                <span className="text-xl font-semibold">
+                  {calculateTotal().retail.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Оптовая цена:</span>
+                <span className="text-2xl font-bold text-accent">
+                  {calculateTotal().wholesale.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              <div className="bg-primary/10 p-4 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-primary">Ваша экономия:</span>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-primary">
+                      {calculateTotal().savings.toLocaleString('ru-RU')} ₽
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      ({calculateTotal().savingsPercent}%)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <Button className="w-full" size="lg" onClick={() => setActiveSection('contacts')}>
+              <Icon name="Phone" size={18} className="mr-2" />
+              Оформить заказ
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <footer className="bg-card border-t py-12">
         <div className="container mx-auto px-4">
