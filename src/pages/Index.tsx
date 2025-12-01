@@ -7,7 +7,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
+import jsPDF from 'jspdf';
+// @ts-ignore
+import autoTable from 'jspdf-autotable';
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState('home');
@@ -197,6 +201,108 @@ const Index = () => {
 
   const deleteCalculation = (id: number) => {
     setCalculationHistory(calculationHistory.filter(calc => calc.id !== id));
+  };
+
+  const exportToPDF = (calc?: typeof calculationHistory[0]) => {
+    const doc = new jsPDF();
+    const calculations = calc ? [calc] : calculationHistory;
+
+    if (calculations.length === 0) {
+      toast({
+        title: 'Нет расчётов',
+        description: 'Сохраните хотя бы один расчёт для экспорта',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('Империал Brick', 14, 20);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Коммерческое предложение', 14, 27);
+    doc.text(`Дата: ${new Date().toLocaleDateString('ru-RU')}`, 14, 32);
+
+    doc.setLineWidth(0.5);
+    doc.line(14, 35, 196, 35);
+
+    const tableData = calculations.map(c => [
+      c.productName,
+      `${c.quantity.toLocaleString('ru-RU')} ${c.unit}`,
+      `${c.retail.toLocaleString('ru-RU')} \u20BD`,
+      `${c.wholesale.toLocaleString('ru-RU')} \u20BD`,
+      `${c.savings.toLocaleString('ru-RU')} \u20BD (${c.savingsPercent}%)`,
+    ]);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [[
+        'Товар',
+        'Количество',
+        'Розница',
+        'Опт',
+        'Экономия',
+      ]],
+      body: tableData,
+      theme: 'striped',
+      headStyles: {
+        fillColor: [193, 122, 95],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: 'bold',
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 5,
+      },
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { cellWidth: 30, halign: 'right' },
+        2: { cellWidth: 30, halign: 'right' },
+        3: { cellWidth: 30, halign: 'right' },
+        4: { cellWidth: 40, halign: 'right', fontStyle: 'bold' },
+      },
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 40;
+
+    const totalRetail = calculations.reduce((sum, c) => sum + c.retail, 0);
+    const totalWholesale = calculations.reduce((sum, c) => sum + c.wholesale, 0);
+    const totalSavings = totalRetail - totalWholesale;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`ИТОГО:`, 14, finalY + 15);
+    doc.text(`Розница: ${totalRetail.toLocaleString('ru-RU')} \u20BD`, 14, finalY + 22);
+    doc.text(`Опт: ${totalWholesale.toLocaleString('ru-RU')} \u20BD`, 14, finalY + 29);
+    doc.setTextColor(193, 122, 95);
+    doc.text(
+      `Ваша экономия: ${totalSavings.toLocaleString('ru-RU')} \u20BD`,
+      14,
+      finalY + 36
+    );
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const footerY = doc.internal.pageSize.height - 20;
+    doc.line(14, footerY - 5, 196, footerY - 5);
+    doc.text('Империал Brick', 14, footerY);
+    doc.text('Тел: +7 (495) 123-45-67', 14, footerY + 5);
+    doc.text('Email: info@imperial-brick.ru', 14, footerY + 10);
+
+    const fileName = calc
+      ? `raschet-${calc.productName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+      : `imperial-brick-raschet-${new Date().getTime()}.pdf`;
+
+    doc.save(fileName);
+
+    toast({
+      title: 'PDF создан',
+      description: 'Файл успешно скачан',
+    });
   };
 
   return (
@@ -812,22 +918,45 @@ const Index = () => {
                 </div>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
-                className="flex-1"
                 size="lg"
                 onClick={saveCalculation}
               >
                 <Icon name="Save" size={18} className="mr-2" />
                 Сохранить
               </Button>
-              <Button className="flex-1" size="lg" onClick={() => {
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => {
+                  if (!selectedProduct) return;
+                  const product = products.find(p => p.id === selectedProduct);
+                  if (!product) return;
+                  const calc = calculateTotal();
+                  exportToPDF({
+                    id: Date.now(),
+                    productName: product.name,
+                    quantity,
+                    unit: product.unit,
+                    retail: calc.retail,
+                    wholesale: calc.wholesale,
+                    savings: calc.savings,
+                    savingsPercent: calc.savingsPercent,
+                    timestamp: new Date().toLocaleString('ru-RU'),
+                  });
+                }}
+              >
+                <Icon name="FileDown" size={18} className="mr-2" />
+                PDF
+              </Button>
+              <Button className="col-span-2" size="lg" onClick={() => {
                 setCalculatorOpen(false);
                 setActiveSection('contacts');
               }}>
                 <Icon name="Phone" size={18} className="mr-2" />
-                Заказ
+                Оформить заказ
               </Button>
             </div>
           </div>
@@ -852,14 +981,26 @@ const Index = () => {
                         <CardTitle className="text-lg mb-1">{calc.productName}</CardTitle>
                         <CardDescription className="text-xs">{calc.timestamp}</CardDescription>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteCalculation(calc.id)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Icon name="Trash2" size={14} className="text-muted-foreground" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => exportToPDF(calc)}
+                          className="h-8 w-8 p-0"
+                          title="Скачать PDF"
+                        >
+                          <Icon name="FileDown" size={14} className="text-muted-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteCalculation(calc.id)}
+                          className="h-8 w-8 p-0"
+                          title="Удалить"
+                        >
+                          <Icon name="Trash2" size={14} className="text-muted-foreground" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -909,15 +1050,26 @@ const Index = () => {
                     <CardTitle className="text-2xl">История расчётов</CardTitle>
                     <CardDescription>Все сохранённые варианты расчёта стоимости</CardDescription>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCalculationHistory([])}
-                    disabled={calculationHistory.length === 0}
-                  >
-                    <Icon name="Trash2" size={16} className="mr-2" />
-                    Очистить всё
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => exportToPDF()}
+                      disabled={calculationHistory.length === 0}
+                    >
+                      <Icon name="FileDown" size={16} className="mr-2" />
+                      Экспорт в PDF
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCalculationHistory([])}
+                      disabled={calculationHistory.length === 0}
+                    >
+                      <Icon name="Trash2" size={16} className="mr-2" />
+                      Очистить всё
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -946,13 +1098,23 @@ const Index = () => {
                             {calc.savings.toLocaleString('ru-RU')} ₽
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteCalculation(calc.id)}
-                        >
-                          <Icon name="X" size={18} />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => exportToPDF(calc)}
+                          >
+                            <Icon name="FileDown" size={16} className="mr-2" />
+                            PDF
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteCalculation(calc.id)}
+                          >
+                            <Icon name="X" size={18} />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
