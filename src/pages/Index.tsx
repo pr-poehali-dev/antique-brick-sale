@@ -22,6 +22,17 @@ const Index = () => {
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [quantity, setQuantity] = useState<number>(1000);
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
+  const [calculationHistory, setCalculationHistory] = useState<Array<{
+    id: number;
+    productName: string;
+    quantity: number;
+    unit: string;
+    retail: number;
+    wholesale: number;
+    savings: number;
+    savingsPercent: string;
+    timestamp: string;
+  }>>([]);
 
   const products = [
     {
@@ -155,6 +166,37 @@ const Index = () => {
   const openCalculator = (productId: number) => {
     setSelectedProduct(productId);
     setCalculatorOpen(true);
+  };
+
+  const saveCalculation = () => {
+    if (!selectedProduct) return;
+    const product = products.find(p => p.id === selectedProduct);
+    if (!product) return;
+
+    const calc = calculateTotal();
+    const newCalculation = {
+      id: Date.now(),
+      productName: product.name,
+      quantity,
+      unit: product.unit,
+      retail: calc.retail,
+      wholesale: calc.wholesale,
+      savings: calc.savings,
+      savingsPercent: calc.savingsPercent,
+      timestamp: new Date().toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+
+    setCalculationHistory([newCalculation, ...calculationHistory]);
+  };
+
+  const deleteCalculation = (id: number) => {
+    setCalculationHistory(calculationHistory.filter(calc => calc.id !== id));
   };
 
   return (
@@ -770,13 +812,156 @@ const Index = () => {
                 </div>
               </div>
             </div>
-            <Button className="w-full" size="lg" onClick={() => setActiveSection('contacts')}>
-              <Icon name="Phone" size={18} className="mr-2" />
-              Оформить заказ
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                size="lg"
+                onClick={saveCalculation}
+              >
+                <Icon name="Save" size={18} className="mr-2" />
+                Сохранить
+              </Button>
+              <Button className="flex-1" size="lg" onClick={() => {
+                setCalculatorOpen(false);
+                setActiveSection('contacts');
+              }}>
+                <Icon name="Phone" size={18} className="mr-2" />
+                Заказ
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {activeSection === 'home' && calculationHistory.length > 0 && (
+        <section className="py-12 bg-muted/30">
+          <div className="container mx-auto px-4 max-w-5xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-3xl font-bold">Сохранённые расчёты</h3>
+              <Badge variant="secondary" className="text-sm">
+                {calculationHistory.length} {calculationHistory.length === 1 ? 'расчёт' : 'расчёта'}
+              </Badge>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              {calculationHistory.slice(0, 4).map((calc) => (
+                <Card key={calc.id} className="hover-scale">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg mb-1">{calc.productName}</CardTitle>
+                        <CardDescription className="text-xs">{calc.timestamp}</CardDescription>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteCalculation(calc.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Icon name="Trash2" size={14} className="text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Количество:</span>
+                        <span className="font-medium">{calc.quantity.toLocaleString('ru-RU')} {calc.unit}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Розница:</span>
+                        <span className="font-medium">{calc.retail.toLocaleString('ru-RU')} ₽</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Опт:</span>
+                        <span className="font-semibold text-accent">{calc.wholesale.toLocaleString('ru-RU')} ₽</span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between items-center">
+                        <span className="font-semibold text-primary">Экономия:</span>
+                        <div className="text-right">
+                          <div className="font-bold text-primary">{calc.savings.toLocaleString('ru-RU')} ₽</div>
+                          <div className="text-xs text-muted-foreground">({calc.savingsPercent}%)</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {calculationHistory.length > 4 && (
+              <div className="text-center mt-6">
+                <Button variant="outline" onClick={() => setActiveSection('catalog')}>
+                  Посмотреть все расчёты ({calculationHistory.length})
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {activeSection === 'catalog' && calculationHistory.length > 0 && (
+        <section className="py-8">
+          <div className="container mx-auto px-4">
+            <Card className="mb-8">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl">История расчётов</CardTitle>
+                    <CardDescription>Все сохранённые варианты расчёта стоимости</CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCalculationHistory([])}
+                    disabled={calculationHistory.length === 0}
+                  >
+                    <Icon name="Trash2" size={16} className="mr-2" />
+                    Очистить всё
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {calculationHistory.map((calc) => (
+                    <div
+                      key={calc.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="font-semibold mb-1">{calc.productName}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {calc.quantity.toLocaleString('ru-RU')} {calc.unit} • {calc.timestamp}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <div className="text-sm text-muted-foreground">Опт</div>
+                          <div className="text-lg font-bold text-accent">
+                            {calc.wholesale.toLocaleString('ru-RU')} ₽
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-muted-foreground">Экономия</div>
+                          <div className="text-lg font-bold text-primary">
+                            {calc.savings.toLocaleString('ru-RU')} ₽
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteCalculation(calc.id)}
+                        >
+                          <Icon name="X" size={18} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
 
       <footer className="bg-card border-t py-12">
         <div className="container mx-auto px-4">
